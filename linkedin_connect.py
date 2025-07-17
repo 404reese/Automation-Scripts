@@ -8,10 +8,9 @@ from selenium.webdriver.common.keys import Keys
 from selenium.common.exceptions import NoSuchElementException, TimeoutException, ElementClickInterceptedException
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
-from dotenv import load_dotenv
 import os
 
-def linkedin_auto_connect(username, password, max_connections=20):
+def linkedin_auto_connect(username, password, max_connections=40):
     # Configure Chrome options to act more human-like
     options = webdriver.ChromeOptions()
     options.add_argument('--disable-blink-features=AutomationControlled')
@@ -33,7 +32,7 @@ def linkedin_auto_connect(username, password, max_connections=20):
     try:
         # Login to LinkedIn
         driver.get("https://www.linkedin.com/login")
-        time.sleep(1 + random.uniform(0.3, 0.7))  # Random delay
+        time.sleep(2 + random.uniform(0.5, 1.5))  # Random delay
         
         # Login process
         username_field = WebDriverWait(driver, 10).until(
@@ -43,28 +42,43 @@ def linkedin_auto_connect(username, password, max_connections=20):
         # Type username like a human
         for char in username:
             username_field.send_keys(char)
-            time.sleep(random.uniform(0.03, 0.2))
+            time.sleep(random.uniform(0.05, 0.3))
         
-        time.sleep(random.uniform(0.3, 0.7))
+        time.sleep(random.uniform(0.5, 1.0))
         
         password_field = driver.find_element(By.ID, "password")
         
         # Type password like a human
         for char in password:
             password_field.send_keys(char)
-            time.sleep(random.uniform(0.03, 0.2))
+            time.sleep(random.uniform(0.05, 0.3))
         
-        time.sleep(random.uniform(0.3, 0.7))
+        time.sleep(random.uniform(0.5, 1.0))
+        
+        # Uncheck "Keep me logged in" checkbox if it's checked
+        try:
+            remember_me_checkbox = WebDriverWait(driver, 5).until(
+                EC.presence_of_element_located((By.ID, "rememberMeOptIn-checkbox"))
+            )
+            
+            # Check if it's already checked
+            if remember_me_checkbox.is_selected():
+                # Find the label and click it to uncheck
+                remember_me_label = driver.find_element(By.XPATH, "//label[@for='rememberMeOptIn-checkbox']")
+                remember_me_label.click()
+                print("Unchecked 'Keep me logged in'")
+                time.sleep(random.uniform(0.5, 1.0))
+        except Exception as e:
+            print(f"Couldn't find or interact with 'Keep me logged in' checkbox: {e}")
+        
+        # Click login
         password_field.send_keys(Keys.RETURN)
-        time.sleep(3 + random.uniform(0.5, 1))  # Wait for login
+        time.sleep(5 + random.uniform(1, 2))  # Wait for login
         
-        # Navigate to the network page
-        print("Please navigate to the page where you want to send connection requests.")
-        print("Examples:")
-        print("- https://www.linkedin.com/search/results/people/?keywords=software%20engineer")
-        print("- https://www.linkedin.com/mynetwork/invite-connect/connections/")
-        print("\nOnce you're on the right page, press Enter to continue...")
-        input()
+        # Automatically navigate to My Network section
+        print("Navigating to My Network page...")
+        driver.get("https://www.linkedin.com/mynetwork/grow/")
+        time.sleep(4 + random.uniform(1, 2))  # Wait for page to load
         
         connections_sent = 0
         fails = 0
@@ -73,7 +87,7 @@ def linkedin_auto_connect(username, password, max_connections=20):
             # Scroll down to load more profiles
             last_height = driver.execute_script("return document.body.scrollHeight")
             driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-            time.sleep(1 + random.uniform(0.3, 0.7))
+            time.sleep(2 + random.uniform(0.5, 1.5))
             
             # Check if we've hit the bottom of the page
             new_height = driver.execute_script("return document.body.scrollHeight")
@@ -81,25 +95,26 @@ def linkedin_auto_connect(username, password, max_connections=20):
                 # Try a few more times with different scrolling techniques
                 for _ in range(3):
                     driver.execute_script("window.scrollBy(0, window.innerHeight);")
-                    time.sleep(0.7 + random.uniform(0.3, 0.5))
+                    time.sleep(1 + random.uniform(0.5, 1))
                     driver.execute_script("window.scrollBy(0, -300);")
-                    time.sleep(0.3)
+                    time.sleep(0.5)
                     driver.execute_script("window.scrollBy(0, 300);")
                     
                     new_height = driver.execute_script("return document.body.scrollHeight")
                     if new_height != last_height:
                         break
             
-            # Find all Connect buttons
+            # Find all Connect buttons - specifically on the My Network page
             try:
-                connect_buttons = driver.find_elements(By.XPATH, "//button[contains(., 'Connect') and not(contains(@disabled, 'true'))]")
+                # On My Network page, the connect buttons often have a specific structure
+                connect_buttons = driver.find_elements(By.XPATH, "//button[contains(@aria-label, 'Connect') or (contains(., 'Connect') and not(contains(., 'connections')))]")
                 
                 # Filter out already connected or pending buttons
                 valid_buttons = []
                 for button in connect_buttons:
                     try:
                         button_text = button.text.strip()
-                        if button_text == "Connect":
+                        if "Connect" in button_text and "Following" not in button_text and "Pending" not in button_text:
                             valid_buttons.append(button)
                     except:
                         continue
@@ -123,7 +138,7 @@ def linkedin_auto_connect(username, password, max_connections=20):
                 try:
                     # Scroll the button into view
                     driver.execute_script("arguments[0].scrollIntoView({behavior: 'smooth', block: 'center'});", button)
-                    time.sleep(0.7 + random.uniform(0.3, 0.5))
+                    time.sleep(1 + random.uniform(0.5, 1))
                     
                     # Click the Connect button
                     try:
@@ -132,7 +147,7 @@ def linkedin_auto_connect(username, password, max_connections=20):
                         # If click intercepted, try with JavaScript
                         driver.execute_script("arguments[0].click();", button)
                     
-                    time.sleep(0.7 + random.uniform(0.3, 0.5))
+                    time.sleep(1 + random.uniform(0.5, 1))
                     
                     # Handle the connection modal
                     try:
@@ -140,16 +155,26 @@ def linkedin_auto_connect(username, password, max_connections=20):
                         send_button = WebDriverWait(driver, 5).until(
                             EC.element_to_be_clickable((By.XPATH, "//button[@aria-label='Send now' or text()='Send' or contains(@aria-label, 'Send invitation')]"))
                         )
-                        time.sleep(random.uniform(0.2, 0.5))
+                        time.sleep(random.uniform(0.3, 0.7))
                         send_button.click()
                         connections_sent += 1
                         print(f"Connection request sent: {connections_sent}/{max_connections}")
-                        time.sleep(1 + random.uniform(0.3, 0.7))  # Wait for the modal to close
+                        time.sleep(2 + random.uniform(0.5, 1.5))  # Wait for the modal to close
                         
                     except TimeoutException:
                         # No modal appeared, check if connection was sent anyway
                         try:
                             # Check if the button changed to "Pending"
+                            # First check original button
+                            try:
+                                if "Pending" in button.text.strip():
+                                    connections_sent += 1
+                                    print(f"Connection request sent (button changed to Pending): {connections_sent}/{max_connections}")
+                                    continue
+                            except:
+                                pass
+                                
+                            # Then check for any pending buttons in the area
                             pending_check = WebDriverWait(driver, 2).until(
                                 EC.presence_of_element_located((By.XPATH, "//button[contains(., 'Pending')]"))
                             )
@@ -169,7 +194,7 @@ def linkedin_auto_connect(username, password, max_connections=20):
                     continue
                 
                 # Random delay between connections to appear more human-like
-                time.sleep(1 + random.uniform(0.5, 1))
+                time.sleep(3 + random.uniform(1, 3))
         
         print(f"\nFinished sending connection requests!")
         print(f"Successful connections sent: {connections_sent}")
@@ -178,17 +203,18 @@ def linkedin_auto_connect(username, password, max_connections=20):
     except Exception as e:
         print(f"An error occurred: {e}")
     finally:
-        print("Script completed. Browser will remain open for you to check results.")
-        print("Press Enter to close the browser...")
-        input()
+        print("Script completed. Browser will close in 5 seconds.")
+        for i in range(5, 0, -1):
+            print(f"Closing browser in {i}...")
+            time.sleep(1)
         driver.quit()
+        print("Browser closed.")
 
 if __name__ == "__main__":
-    # Load environment variables from .env file
-    load_dotenv()
+    
     LINKEDIN_USERNAME = os.getenv("LINKEDIN_USERNAME")
     LINKEDIN_PASSWORD = os.getenv("LINKEDIN_PASSWORD")
-    if not LINKEDIN_USERNAME or not LINKEDIN_PASSWORD:
-        print("Please set LINKEDIN_USERNAME and LINKEDIN_PASSWORD in your .env file.")
-        exit(1)
-    linkedin_auto_connect(LINKEDIN_USERNAME, LINKEDIN_PASSWORD, max_connections=40)
+    
+    max_conn = 40
+
+    linkedin_auto_connect(LINKEDIN_USERNAME, LINKEDIN_PASSWORD, max_connections=max_conn)
